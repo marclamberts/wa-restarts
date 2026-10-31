@@ -7,13 +7,15 @@
     wr.teams("2. Bundesliga 2026-2027")                  # clubs in one league-season
     wr.league("2. Bundesliga 2026-2027", focus_team="Hertha BSC")   # league folder (charts, visual pack, CSVs)
     wr.club("2. Bundesliga 2026-2027", "Hertha")         # one club's set-piece pack
+    wr.xdanger_players("2. Bundesliga 2026-2027")        # xDanger per player (also _actions, _teams; xdanger() writes all)
 """
 from pathlib import Path
 
 from . import config
 from .config import configure
 
-__all__ = ["configure", "styles", "leagues", "teams", "score", "league", "club", "build"]
+__all__ = ["configure", "styles", "leagues", "teams", "score", "league", "club", "build", "xdanger", "xdanger_actions",
+           "xdanger_players", "xdanger_teams"]
 
 
 def styles():
@@ -64,12 +66,38 @@ def club(comp, team, out_root=None, refresh=False):
     return club_pack.run(comp, team, out_root=out_root)
 
 
-def build(comp, teams=(), focus_team=None, out_root=None, refresh=False):
-    """League folder plus a club pack for each team in teams."""
+def build(comp, teams=(), focus_team=None, out_root=None, refresh=False, xdanger_tables=False):
+    """League folder plus a club pack for each team in teams (and the xDanger tables when xdanger_tables=True)."""
     out = [league(comp, focus_team=focus_team or (teams[0] if teams else None), out_root=out_root, refresh=refresh)]
     for t in teams:
         out.append(club(comp, t, out_root=out_root))
+    if xdanger_tables:
+        out.append(xdanger(comp, out_root=out_root))
     return out
+
+
+def xdanger(comp, out_root=None, refresh=False):
+    """<out_root>/<comp>/xdanger/: xdanger_actions.parquet, player_xdanger.csv, team_xdanger.csv."""
+    from . import xdanger_tables as xd
+    return xd.run(comp, out_root=out_root, refresh=refresh)
+
+
+def xdanger_actions(comp, refresh=False):
+    """DataFrame: every on-ball action with xG, xDanger, xDanger added / won / denied, receiver values and xShot."""
+    from . import xdanger_tables as xd
+    return xd.actions(comp, refresh=refresh)
+
+
+def xdanger_players(comp, min_minutes=0):
+    """DataFrame: xDanger per player, totals and per 90, sorted by xDanger added per 90."""
+    from . import xdanger_tables as xd
+    return xd.players(comp, min_minutes=min_minutes)
+
+
+def xdanger_teams(comp):
+    """DataFrame: xDanger and xG per match for and against, per team."""
+    from . import xdanger_tables as xd
+    return xd.teams(comp)
 
 
 def _match_team(comp, team):

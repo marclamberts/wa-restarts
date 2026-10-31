@@ -5,7 +5,8 @@ league-season and it builds:
 
 - a **league folder**: restart options per restart type, club set-piece profiles and a 24-chart visual pack (pitch
   maps, scatters, pizzas, beeswarms, bars, box plots), each with its CSV;
-- a **club pack** for any club: 59 charts on its attacking and defending restarts, plus every restart as CSV.
+- a **club pack** for any club: 59 charts on its attacking and defending restarts, plus every restart as CSV;
+- **xDanger** for every action, player and team (see [xDanger](#xdanger)).
 
 Each restart is scored with pre-trained models (xG, xGOT, xDanger, xShot). The models were trained on every IMPECT
 league from 2024 to 2027 by [Waltzing Analytics](https://github.com/marclamberts). Nothing is retrained, and a league
@@ -83,6 +84,64 @@ Scoring is cached in `~/.cache/wa_restarts/<league-season>/` and reruns on its o
 | `visual pack/club_set_piece_table.csv`, `club_percentiles.csv` | tables behind the visual pack |
 | `<club> set pieces/NN_*.png` | 59-chart club pack |
 | `<club> set pieces/restarts_for.csv`, `restarts_against.csv`, `league_set_piece_table.csv` | every restart by and against the club, and the league table |
+
+## xDanger
+
+**xDanger is how dangerous the next 15 seconds are for the team on the ball: the most dangerous moment it is expected
+to reach, as a goal probability.** A shot counts at its xG. A dangerous moment that needs no shot counts at the share of
+those moments followed by a goal within 15 s. The goal rates below come from 69M actions in the training seasons:
+
+| Danger event | Goal within 15 s |
+|---|---|
+| Golden-zone touch (penalty spot to goal line, six-yard-box width) | 16.5% |
+| Cutback (completed pass from near the byline back into the box) | 11.8% |
+| Box entry by carry / by pass | 7.3% / 7.2% |
+| Free kick within 30 m | 4.1% |
+| Corner | 3.4% |
+| Final-third regain | 3.0% |
+
+The model is a LightGBM regression on every on-ball action: start and end location, type, result, pressure, opponents,
+the two previous actions and possession context. On the held-out 2026 and 2026-2027 seasons its Brier skill over a
+constant baseline is 25%, and it is calibrated across 20 bins. It ships in `wa_restarts/reference/models/`.
+
+```python
+import wa_restarts as wr
+
+wr.configure(json_root="events_json")
+actions = wr.xdanger_actions("Eredivisie 2026-2027")              # one row per on-ball action
+players = wr.xdanger_players("Eredivisie 2026-2027", min_minutes=450)
+teams = wr.xdanger_teams("Eredivisie 2026-2027")
+wr.xdanger("Eredivisie 2026-2027")   # writes <out>/<league>/xdanger/: xdanger_actions.parquet, player_xdanger.csv, team_xdanger.csv
+```
+
+```bash
+wa-restarts --json-root events_json xdanger "Eredivisie 2026-2027"
+wa-restarts --json-root events_json build "Eredivisie 2026-2027" --club Ajax --xdanger
+```
+
+**Per action** (`xdanger_actions`):
+
+| Column | Meaning |
+|---|---|
+| `xdanger` | danger of the next 15 s after the action (for the team in possession) |
+| `xd_before`, `xd_after` | value of the moment before and after the action. For a restart, "before" is the average outcome of that restart type from that 10 m zone |
+| `xd_added` | `xd_after - xd_before` for the attacking team. Shots carry none (see `xd_shot_sel`), and the value of controlling a completed pass goes to the passer |
+| `xd_won` | xDanger at the first action of a possession the team wins (not a restart) |
+| `xd_denied` | the attacking team's latest xDanger, ended by an interception, regain, block, clearance, duel or keeper action |
+| `xd_shot_sel` | a shot's xG minus the danger of the moment it was taken from (shot selection) |
+| `xd_received`, `xd_rec_control` | danger of the spot where a pass is received, and what the first touch adds |
+| `danger_event` | the danger event the action is, if any |
+| `xg`, `xshot`, `xs_added` | shot xG; chance of a shot in the next 15 s, and its change |
+
+**Per player** (`xdanger_players`): totals and per 90 of xDanger added (split into passes, carries and other), won,
+denied, shot selection, received and reception control, plus xG, danger-event counts (`n_*`) and minutes. Receiver
+values are also shown relative to the team's outfield average (`*_vs_team_p90`), because about a third of them is team
+effect.
+
+**Per team** (`xdanger_teams`): xDanger for and against per match, counting positive in-possession xDanger added only
+(this version predicts future goals better than xG), plus xG for and against.
+
+Minutes are estimated from first and last touch per period, so per-90 numbers run slightly high for substitutes.
 
 ## Method
 

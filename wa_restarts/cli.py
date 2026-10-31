@@ -5,6 +5,7 @@
     wa-restarts league "2. Bundesliga 2026-2027" --focus "Hertha BSC"
     wa-restarts club "2. Bundesliga 2026-2027" "Hertha" "St. Pauli"
     wa-restarts build "2. Bundesliga 2026-2027" --club "Hertha BSC"     # league folder + club packs
+    wa-restarts xdanger "2. Bundesliga 2026-2027"                       # xDanger per action, player, team
 """
 import argparse
 
@@ -43,9 +44,13 @@ def main(argv=None):
     p.add_argument("league")
     p.add_argument("teams", nargs="+")
     p.add_argument("--refresh", action="store_true")
+    p = sub.add_parser("xdanger", help="xDanger tables: every action (parquet), players and teams (CSV)")
+    p.add_argument("league")
+    p.add_argument("--refresh", action="store_true")
     p = sub.add_parser("build", help="league folder plus club packs")
     p.add_argument("league")
     p.add_argument("--club", action="append", default=[], help="repeat for several clubs")
+    p.add_argument("--xdanger", action="store_true", help="also write the xDanger tables")
     p.add_argument("--refresh", action="store_true")
     a = ap.parse_args(argv)
     wr.configure(**{k: v for k, v in {"json_root": a.json_root, "meta_root": a.meta_root, "out_root": a.out,
@@ -65,8 +70,10 @@ def main(argv=None):
     elif a.cmd == "club":
         for i, t in enumerate(a.teams):
             wr.club(a.league, t, refresh=a.refresh and i == 0)
+    elif a.cmd == "xdanger":
+        wr.xdanger(a.league, refresh=a.refresh)
     elif a.cmd == "build":
-        wr.build(a.league, teams=a.club, refresh=a.refresh)
+        wr.build(a.league, teams=a.club, refresh=a.refresh, xdanger_tables=a.xdanger)
 
 
 if __name__ == "__main__":
