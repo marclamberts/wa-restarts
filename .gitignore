@@ -1,0 +1,13 @@
+__pycache__/
+*.egg-info/
+build/
+dist/
+.ipynb_checkpoints/
+.DS_Store
+# Apple system fonts: extract locally, never commit (see README)
+wa_restarts/fonts/
+# data and outputs
+events_json/
+events_meta/
+wa_restarts_output/
+cache/

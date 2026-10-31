@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "wa-restarts"
+version = "0.1.0"
+description = "IMPECT event data to Waltzing Analytics set-piece and restart visuals and CSVs"
+authors = [{ name = "Marc Lamberts" }]
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.10"
+dependencies = [
+    "numpy",
+    "pandas>=2.0",
+    "pyarrow",
+    "matplotlib",
+    "mplsoccer>=1.2",
+    "adjustText",
+    "lightgbm==4.6.0",
+    "scikit-learn==1.7.2",
+    "joblib",
+]
+
+[project.scripts]
+wa-restarts = "wa_restarts.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["wa_restarts*"]
+
+[tool.setuptools.package-data]
+wa_restarts = ["reference/*.csv", "reference/*.parquet", "reference/models/*.joblib"]
+
+[project.urls]
+Repository = "https://github.com/marclamberts/wa-restarts"

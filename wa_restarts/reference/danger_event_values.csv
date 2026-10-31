@@ -1,0 +1,8 @@
+event,description,count,goals_within_15s,value
+golden_zone_touch,"Touch between the penalty spot and goal, inside the six-yard box width",490611,81150.0,0.1654059937506497
+cutback,Completed pass from near the byline back into the box,34777,4105.0,0.1180377835926043
+box_entry_pass,Completed pass from outside into the box,282179,20398.0,0.0722874487470719
+box_entry_carry,Successful carry from outside into the box,191715,13980.0,0.07292074172599954
+high_regain,Interception or loose-ball regain in the final third,763721,22702.0,0.02972551494590302
+corner,Corner kick,213548,7205.0,0.033739487141064305
+dangerous_free_kick,Free kick within 30 m of goal,11968,492.0,0.041109625668449196
