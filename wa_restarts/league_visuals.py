@@ -14,18 +14,29 @@ from . import config
 from . import options as ro
 from . import pitch as pv
 from .names import squad_names
-from .style import ACCENT, BG, BLUE, DANGER_CMAP, GOLD, GREY, HAIR, INK, MUTED, MUTED2, TEAL, L, W, Page, clean
+from . import style
+from .style import (ACCENT, BG, BLUE, DANGER_CMAP, GOLD, GREY, HAIR, INK, MUTED, MUTED2, PURPLE, SLATE, TEAL, L, W, Page,
+                    clean)
 
 COMP = ""
 FOCUS_TEAM = None
 OUT = Path(".")
 SRC = ""
-PITCH = dict(pitch_type="custom", pitch_length=105, pitch_width=68, pitch_color=BG, line_color=HAIR, linewidth=1, line_zorder=3)
 ZOOM = dict(half=True, pad_bottom=-24, pad_top=2)
 TYPES = ["Corner", "Short corner", "Indirect free kick", "Direct free kick", "Penalty", "Throw-in"]
-TCOL = {"Corner": ACCENT, "Short corner": GOLD, "Indirect free kick": TEAL, "Direct free kick": BLUE, "Penalty": "#8C7BD1",
-        "Throw-in": "#6B7884"}
 N = {"i": 0}
+
+
+@style.on_theme
+def _theme():
+    """Colour constants built from the current theme."""
+    global PITCH, TCOL, PCOL
+    PITCH = dict(pitch_type="custom", pitch_length=105, pitch_width=68, pitch_color=style.BG, line_color=style.HAIR, linewidth=1,
+                 line_zorder=3)
+    TCOL = {"Corner": style.ACCENT, "Short corner": style.GOLD, "Indirect free kick": style.TEAL, "Direct free kick": style.BLUE,
+            "Penalty": style.PURPLE, "Throw-in": style.SLATE}
+    PCOL = [style.ACCENT] * 6 + [style.GOLD] * 4 + [style.TEAL] * 2
+
 
 
 def save(p, name):
@@ -249,7 +260,6 @@ PIZZA = [("sp_xg_pm", "Set-piece\nxG / match", False), ("sp_goals", "Set-piece\n
          ("reach_danger", "Restarts\nreaching danger", False), ("second_ball", "Second\nballs won", False), ("set_piece_won", "Another\nset piece", False),
          ("gk_retention", "Goal-kick\nretention", False), ("sp_xg_against_pm", "Set-piece xG\nconceded", True),
          ("sp_goals_against", "Set-piece goals\nconceded", True)]
-PCOL = [ACCENT] * 6 + [GOLD] * 4 + [TEAL] * 2
 
 
 def percentiles(t):
@@ -264,11 +274,11 @@ def draw_pizza(ax, vals, small=False):
     pz = PyPizza(params=[lab for _, lab, _ in PIZZA], background_color=BG, straight_line_color=HAIR, straight_line_lw=0.8,
                  last_circle_color=HAIR, last_circle_lw=1, other_circle_color=HAIR, other_circle_lw=0.5, other_circle_ls="-",
                  inner_circle_size=10 if small else 14)
-    pz.make_pizza([int(v) for v in vals], ax=ax, param_location=112, slice_colors=PCOL, value_colors=[BG] * len(PIZZA),
+    pz.make_pizza([int(v) for v in vals], ax=ax, param_location=112, slice_colors=PCOL, value_colors=[style.text_on(c) for c in PCOL],
                   value_bck_colors=PCOL, blank_alpha=0.18, color_blank_space="same",
                   kwargs_slices=dict(edgecolor=BG, zorder=2, linewidth=1),
                   kwargs_params=dict(color=MUTED2 if not small else BG, fontsize=7.5 if not small else 1, va="center"),
-                  kwargs_values=dict(color=BG, fontsize=8 if not small else 5.5, zorder=3,
+                  kwargs_values=dict(fontsize=8 if not small else 5.5, zorder=3,
                                      bbox=dict(edgecolor=BG, facecolor="none", boxstyle="round,pad=0.15", lw=0.8)))
     if small:
         for txt in pz.get_param_texts() + pz.get_value_texts():
@@ -396,7 +406,7 @@ def corner_mix(d):
     co = d[d.restart.isin(["Corner", "Short corner"])].copy()
     co["zone"] = np.where(co.restart == "Short corner", "Short", co.option.str.split(", ").str[1].str.capitalize())
     zones = ["Near post", "Six-yard centre", "Far post", "Penalty spot", "Edge of the box", "Short"]
-    zcol = dict(zip(zones, [BLUE, ACCENT, "#8C7BD1", GOLD, GREY, TEAL]))
+    zcol = dict(zip(zones, [BLUE, ACCENT, PURPLE, GOLD, GREY, TEAL]))
     sh = co.groupby("team").zone.value_counts(normalize=True).unstack(fill_value=0).reindex(columns=zones, fill_value=0)
     sh = sh.loc[(sh["Six-yard centre"] + sh["Penalty spot"]).sort_values().index]
     p = Page(0.36 * len(sh) + 2.9, f"Corner targets by club  ·  {COMP}", f"{sh.index[-1]} aim at the six-yard centre and penalty spot most",
@@ -486,7 +496,7 @@ def box_corner_options(d):
 def run(comp, out_dir, focus_team=None):
     global COMP, FOCUS_TEAM, OUT, SRC
     COMP, FOCUS_TEAM, OUT = comp, focus_team, Path(out_dir)
-    SRC = f"Data: IMPECT, {COMP}  ·  xDanger, xShot, xG, xGOT and restart pillars: Waltzing Analytics"
+    SRC = config.source(COMP)
     N["i"] = 0
     OUT.mkdir(parents=True, exist_ok=True)
     for old in OUT.glob("B[0-9][0-9]_*.png"):  # numbering shifts with the focus club, so clear the last run

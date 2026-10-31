@@ -1,20 +1,123 @@
-"""Waltzing Analytics dark navy page frame for single-chart exports (layout in inches)."""
+"""Waltzing Analytics page frame for single-chart exports (layout in inches), in seven colour themes.
+
+The six house themes form a temperature x lightness grid (cool: fog, dusk, navy; warm: cream, clay, espresso) with the
+coral accent held constant; xhotspur is the Tottenham club theme (Spurs navy as the accent, coral kept for the mark).
+use("fog") switches every chart module at once; navy is the default.
+"""
+import sys
 from datetime import date
 from pathlib import Path
 
 from matplotlib import font_manager
 
 import matplotlib.pyplot as plt
-from matplotlib.colors import LinearSegmentedColormap
+from matplotlib.colors import LinearSegmentedColormap, to_hex, to_rgb
 from matplotlib.patches import FancyBboxPatch, Rectangle
 
 from . import config
 
-BG, CARD, INK, MUTED, MUTED2, HAIR = "#14202B", "#1C2935", "#F2EFE6", "#86847E", "#A8A6A0", "#384653"
-ACCENT, TEAL, BLUE, GOLD, RED, GREY = "#E8794C", "#1FA88C", "#5B8AC9", "#B37F1E", "#D9663A", "#3C4A57"
-# xDanger added sources: passes include the reception they set up; shots sit outside (shot selection)
-COMPONENTS = [("pass", "Passes", BLUE), ("carry", "Carries", TEAL), ("other", "Restarts, other", "#6B7884")]
-DANGER_CMAP = LinearSegmentedColormap.from_list("wa_danger", [BG, GREY, GOLD, ACCENT, "#F7D8C6"])
+
+def _mix(a, b, t):
+    return to_hex([x + (y - x) * t for x, y in zip(to_rgb(a), to_rgb(b))])
+
+
+# canvas, ink, muted (footer), muted2 (labels), hairline, accent, below-average/secondary series (blue),
+# third series (teal), fourth series (gold); anything missing is derived in _tokens()
+THEMES = {
+    "navy": dict(BG="#14202B", INK="#F2EFE6", MUTED="#86847E", MUTED2="#A8A6A0", HAIR="#384653", ACCENT="#E8794C",
+                 BLUE="#5B8AC9", TEAL="#1FA88C", GOLD="#B37F1E", CARD="#1C2935", GREY="#3C4A57", SLATE="#6B7884",
+                 DIM="#2A3A48", DIM2="#2E3B48", DANGER_TOP="#F7D8C6"),
+    "fog": dict(BG="#E7ECEE", INK="#1A2226", MUTED="#78888D", HAIR="#CBD6D9", ACCENT="#E8794C",
+                BLUE="#4C7A93", TEAL="#5E8C6A", GOLD="#C0902F"),
+    "dusk": dict(BG="#4A5A66", INK="#EDF1F2", MUTED="#A9BAC0", MUTED2="#CBD8DB", HAIR="#6B7D85", ACCENT="#E8794C",
+                 BLUE="#7B7FB0", TEAL="#6FA68C", GOLD="#D9A84E"),
+    "cream": dict(BG="#F5F1E8", INK="#20201C", MUTED="#8B8880", HAIR="#DFD9C8", ACCENT="#E8794C",
+                  BLUE="#8A8F5C", TEAL="#4C8573", GOLD="#C08A2E"),
+    "clay": dict(BG="#5C4E41", INK="#F1ECDF", MUTED="#B4A794", MUTED2="#D6CAB5", HAIR="#7C6C57", ACCENT="#E8794C",
+                 BLUE="#8FA6B8", TEAL="#6B8F6A", GOLD="#D2A24C"),
+    "espresso": dict(BG="#1E1811", INK="#F1ECDF", MUTED="#9A8C77", MUTED2="#C4B9A5", HAIR="#3C3122", ACCENT="#E8794C",
+                     BLUE="#4A8C82", TEAL="#7FA3B8", GOLD="#C99A3E"),
+    "xhotspur": dict(BG="#F7F8FA", INK="#132257", MUTED="#6B7591", MUTED2="#4F5A78", HAIR="#D5DAE6", ACCENT="#132257",
+                     BLUE="#8FA0CC", TEAL="#4F6DB8", GOLD="#C9A227", GREY="#C9D0E0", BAND="#132257"),
+}
+LIGHT = {"fog", "cream", "xhotspur"}
+
+
+def _tokens(name):
+    t = dict(THEMES[name])
+    bg, ink, light = t["BG"], t["INK"], name in LIGHT
+    t.setdefault("MUTED2", _mix(ink, bg, 0.38))       # light canvases: labels need more contrast than the footer grey
+    t.setdefault("CARD", _mix(bg, "#FFFFFF", 0.55) if light else _mix(bg, ink, 0.04))
+    t.setdefault("GREY", _mix(bg, ink, 0.16))         # context bars and points
+    t.setdefault("SLATE", _mix(bg, ink, 0.40))
+    t.setdefault("DIM", _mix(bg, ink, 0.09))
+    t.setdefault("DIM2", t["DIM"])
+    t.setdefault("DANGER_TOP", _mix(t["ACCENT"], ink, 0.35 if light else 0.55))
+    t.setdefault("RED", "#D9663A")
+    t.setdefault("PURPLE", "#8C7BD1")
+    t.setdefault("MARK_COLOR", "#E8794C")             # the mark stays coral in every theme
+    t.setdefault("BAND", None)
+    t["DANGER_CMAP"] = LinearSegmentedColormap.from_list("wa_danger", [bg, t["GREY"], t["GOLD"], t["ACCENT"], t["DANGER_TOP"]])
+    t["COMPONENTS"] = [("pass", "Passes", t["BLUE"]), ("carry", "Carries", t["TEAL"]), ("other", "Restarts, other", t["SLATE"])]
+    return t
+
+
+def _lum(c):
+    lin = [x / 12.92 if x <= 0.04045 else ((x + 0.055) / 1.055) ** 2.4 for x in to_rgb(c)]
+    return 0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2]
+
+
+def ink_on(color, alpha=1.0):
+    """Text colour for a value printed on a filled cell: the theme ink, unless it would vanish into the cell
+    (e.g. navy text on a navy cell in xhotspur); then whichever of ink and canvas reads better."""
+    cell = _mix(BG, color, alpha)
+    ratio = lambda a, b: (max(_lum(a), _lum(b)) + 0.05) / (min(_lum(a), _lum(b)) + 0.05)
+    if ratio(INK, cell) >= 2.2:
+        return INK
+    return INK if ratio(INK, cell) >= ratio(BG, cell) else BG
+
+
+def text_on(color):
+    """Canvas or ink, whichever reads better on a solid fill (pizza and bar labels)."""
+    ratio = lambda a, b: (max(_lum(a), _lum(b)) + 0.05) / (min(_lum(a), _lum(b)) + 0.05)
+    return BG if ratio(BG, color) >= ratio(INK, color) else INK
+
+
+THEME = config.STYLE.lower() if config.STYLE.lower() in THEMES else "navy"
+globals().update(_tokens(THEME))
+_HOOKS = []
+
+
+def on_theme(fn):
+    """Register a module function that rebuilds colour constants derived from the tokens (pitch dicts, colour maps)."""
+    _HOOKS.append(fn)
+    fn()
+    return fn
+
+
+def themes():
+    return list(THEMES)
+
+
+def use(name):
+    """Switch every chart module to theme name (navy, fog, dusk, cream, clay, espresso, xhotspur)."""
+    global THEME
+    name = name.lower()
+    if name not in THEMES:
+        raise ValueError(f"Unknown style '{name}'. Styles: {', '.join(THEMES)}")
+    THEME = name
+    t = _tokens(name)
+    globals().update(t)
+    for mod in list(sys.modules.values()):
+        if getattr(mod, "__name__", "").startswith("wa_restarts.") and mod not in (sys.modules[__name__], config):
+            for k, v in t.items():
+                if k in vars(mod):
+                    setattr(mod, k, v)
+    _rc()
+    for fn in _HOOKS:
+        fn()
+
+
 W = 11.0
 L, R = 0.55, 0.55
 
@@ -58,14 +161,21 @@ _nan_safe_bins()
 SANS = _first("Helvetica Neue", "Helvetica", "Arial", "Liberation Sans", "DejaVu Sans")
 SERIF = _first("Georgia", "Times New Roman", "Liberation Serif", "DejaVu Serif")
 
-plt.rcParams.update({"font.family": SANS, "text.color": INK, "axes.labelcolor": MUTED2,
-                     "xtick.color": MUTED2, "ytick.color": MUTED2, "axes.edgecolor": HAIR,
-                     "axes.facecolor": BG, "figure.facecolor": BG, "axes.labelsize": 9.5,
-                     "xtick.labelsize": 9, "ytick.labelsize": 9})
+
+
+def _rc():
+    plt.rcParams.update({"font.family": SANS, "text.color": INK, "axes.labelcolor": MUTED2,
+                         "xtick.color": MUTED2, "ytick.color": MUTED2, "axes.edgecolor": HAIR,
+                         "axes.facecolor": BG, "figure.facecolor": BG, "axes.labelsize": 9.5,
+                         "xtick.labelsize": 9, "ytick.labelsize": 9})
+
+
+_rc()
 
 
 class Page:
-    def __init__(self, h, eyebrow, title, subtitle, source="Data: IMPECT, all leagues 2024 to 2027  ·  xG and xDanger: Waltzing Analytics"):
+    def __init__(self, h, eyebrow, title, subtitle, source=None):
+        source = source or config.source()
         self.h = h
         self.fig = plt.figure(figsize=(W, h), facecolor=BG)
         bg = self.fig.add_axes([0, 0, 1, 1])
@@ -74,6 +184,8 @@ class Page:
         bg.set_autoscale_on(False)
         self.bg = bg
         y = lambda inch: 1 - inch / h
+        if BAND:  # club themes: a thin band in the club colour across the top edge
+            bg.add_patch(Rectangle((0, y(0.07)), 1, 0.07 / h, color=BAND, lw=0, transform=bg.transAxes))
         bg.add_patch(Rectangle((L / W, y(0.52) - 0.04 / h), 0.09 / W, 0.09 / h, color=ACCENT, transform=bg.transAxes))
         bg.text((L + 0.17) / W, y(0.48), eyebrow.upper(), color=ACCENT, fontsize=9.5, weight="bold", va="center")
         t = bg.text(L / W, y(0.95), title, family=SERIF, weight="bold", fontsize=21, color=INK, va="center")
@@ -85,7 +197,7 @@ class Page:
         bg.text(L / W, y(1.33), subtitle, fontsize=10.5, color=MUTED2, va="center")
         # WA lockup: mark, divider, wordmark
         xr = 1 - R / W
-        bg.text(xr - 1.74 / W, y(0.6), config.MARK, color=ACCENT, fontsize=24, weight="bold", ha="right", va="center")
+        bg.text(xr - 1.74 / W, y(0.6), config.MARK, color=MARK_COLOR, fontsize=24, weight="bold", ha="right", va="center")
         bg.plot([xr - 1.52 / W] * 2, [y(0.4), y(0.76)], color=HAIR, lw=1, transform=bg.transAxes)
         bg.text(xr, y(0.52), config.BRAND.upper(), fontsize=9, weight="bold", ha="right", va="center", color=INK)
         bg.text(xr, y(0.72), config.AUTHOR.upper(), fontsize=7, ha="right", va="center", color=MUTED)

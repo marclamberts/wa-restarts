@@ -21,11 +21,15 @@ def main(argv=None):
     ap.add_argument("--meta-root", help="folder with <league-season>/squads.json, matches.json (default: events_meta next to the JSON root)")
     ap.add_argument("--out", help="deliverables root (default: ./wa_restarts_output)")
     ap.add_argument("--cache", help="where scored parquet files are kept (default: ~/.cache/wa_restarts)")
-    ap.add_argument("--author", help="name in the chart header and footer")
-    ap.add_argument("--brand", help="wordmark in the chart header")
-    ap.add_argument("--mark", help="short mark in the chart header, e.g. WA")
+    ap.add_argument("--style", help="colour theme: navy (default), fog, dusk, cream, clay, espresso, xhotspur")
+    ap.add_argument("--author", help="made by: name in the chart header and footer (default: Marc Lamberts)")
+    ap.add_argument("--brand", help="wordmark in the chart header (default: Waltzing Analytics)")
+    ap.add_argument("--mark", help="short mark in the chart header (default: WA)")
+    ap.add_argument("--data", help="data credit in the source line (default: IMPECT)")
+    ap.add_argument("--models-by", help="model credit in the source line (default: Waltzing Analytics)")
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("leagues", help="league-seasons with event JSON")
+    sub.add_parser("styles", help="colour themes")
     p = sub.add_parser("teams", help="clubs in a league-season")
     p.add_argument("league")
     p = sub.add_parser("score", help="score a league-season into the cache only")
@@ -45,10 +49,13 @@ def main(argv=None):
     p.add_argument("--refresh", action="store_true")
     a = ap.parse_args(argv)
     wr.configure(**{k: v for k, v in {"json_root": a.json_root, "meta_root": a.meta_root, "out_root": a.out,
-                                      "cache": a.cache, "author": a.author, "brand": a.brand,
-                                      "mark": a.mark}.items() if v})
+                                      "cache": a.cache, "style": a.style, "author": a.author,
+                                      "brand": a.brand, "mark": a.mark, "data": a.data,
+                                      "models_by": a.models_by}.items() if v})
     if a.cmd == "leagues":
         print("\n".join(wr.leagues()))
+    elif a.cmd == "styles":
+        print("\n".join(wr.styles()))
     elif a.cmd == "teams":
         print("\n".join(wr.teams(a.league)))
     elif a.cmd == "score":

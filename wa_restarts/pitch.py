@@ -2,14 +2,18 @@
 from matplotlib import cm
 from mplsoccer import Pitch, VerticalPitch
 
+from . import config, style
 from .style import BG, HAIR, MUTED2, L, W, Page
 
-PITCH = dict(pitch_type="custom", pitch_length=105, pitch_width=68, pitch_color=BG, line_color=HAIR,
-             linewidth=1, line_zorder=3)
-SRC_X = "Data: IMPECT  ·  xG and xDanger: Waltzing Analytics"
+
+@style.on_theme
+def _theme():
+    global PITCH
+    PITCH = dict(pitch_type="custom", pitch_length=105, pitch_width=68, pitch_color=style.BG, line_color=style.HAIR,
+                 linewidth=1, line_zorder=3)
 
 
-def page(title, eyebrow, sub, kind="full", cards=None, legend=None, cbar=None, src=SRC_X, ncols=1):
+def page(title, eyebrow, sub, kind="full", cards=None, legend=None, cbar=None, src=None, ncols=1):
     """Page with one or more pitches. kind: full | half (vertical attacking half)."""
     pitch_h = {"full": 6.35, "half": 5.6}[kind]
     top = 1.75 + (1.15 if cards else 0) + (0.4 if legend else 0)

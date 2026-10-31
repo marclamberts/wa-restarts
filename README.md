@@ -11,7 +11,7 @@ Each restart is scored with pre-trained models (xG, xGOT, xDanger, xShot). The m
 league from 2024 to 2027 by [Waltzing Analytics](https://github.com/marclamberts). Nothing is retrained, and a league
 of about 300 matches takes under a minute on a laptop.
 
-![style](https://img.shields.io/badge/style-WA%20dark%20navy-14202B) ![licence](https://img.shields.io/badge/licence-MIT-E8794C)
+![styles](https://img.shields.io/badge/styles-7-14202B) ![licence](https://img.shields.io/badge/licence-MIT-E8794C)
 
 ## Install
 
@@ -64,8 +64,8 @@ wr.teams("3. Liga 2026-2027")
 wr.build("3. Liga 2026-2027", teams=["Rot-Weiss Essen"])
 ```
 
-Notebook: [`notebooks/restarts_pack.ipynb`](notebooks/restarts_pack.ipynb) is one cell. Set the league folder and the
-clubs, then run it.
+Notebook: [`notebooks/restarts_pack.ipynb`](notebooks/restarts_pack.ipynb) is one cell. Set the league folder, clubs,
+style and credits, then run it.
 
 Scoring is cached in `~/.cache/wa_restarts/<league-season>/` and reruns on its own when new match files arrive
 (`--refresh` forces a rerun).
@@ -107,16 +107,49 @@ live play** after it. The window stops early at the next restart, a goal, or a g
 what came next. Free kicks are split by half, box delivery and distance. Throw-ins are split by zone, length and
 direction. Goal kicks and kick-offs are split by destination, and penalties by placement.
 
-## Branding and fonts
+## Styles
 
-The charts use the Waltzing Analytics dark navy style. Set your own name in the header and footer with:
+Seven colour themes. Six of them make up the Waltzing Analytics grid: cool or warm, crossed with light, mid or dark.
+The seventh is a club theme. The coral accent stays the same everywhere except the club theme.
+
+![styles](docs/styles.png)
+
+| | Light | Mid | Dark |
+|---|---|---|---|
+| **Cool** | `fog` | `dusk` | `navy` (default) |
+| **Warm** | `cream` | `clay` | `espresso` |
+| **Club** | `xhotspur`: lilywhite with Spurs navy as the accent, a navy top band, and the coral mark | | |
 
 ```bash
-wa-restarts --author "Your Name" --brand "Your Brand" --mark "YB" ...
+wa-restarts --style fog build "3. Liga 2026-2027"
+wa-restarts styles
 ```
 
-You can also set `WA_RESTARTS_AUTHOR`, `WA_RESTARTS_BRAND` and `WA_RESTARTS_MARK`, or call
-`wr.configure(author=..., brand=..., mark=...)`. Model credit stays in the source line.
+In Python, call `wr.configure(style="espresso")`. Values printed on filled cells switch between light and dark text so
+they stay readable in every theme.
+
+## Credits
+
+Every chart carries a header (mark, wordmark, author) and a footer (source line, author and date). Each part is a
+setting:
+
+| Setting | Where it shows | Default |
+|---|---|---|
+| `author` | "made by", in the header and footer | Marc Lamberts |
+| `brand` | wordmark in the header | Waltzing Analytics |
+| `mark` | short mark in the header | WA |
+| `data` | data credit in the source line | IMPECT |
+| `models_by` | model credit in the source line (empty string drops it) | Waltzing Analytics |
+
+```python
+wr.configure(author="Your Name", brand="Your Brand", mark="YB", data="IMPECT", models_by="Waltzing Analytics")
+```
+
+The CLI takes the same settings as `--author`, `--brand`, `--mark`, `--data` and `--models-by`. The environment
+variables are `WA_RESTARTS_AUTHOR`, `_BRAND`, `_MARK`, `_DATA`, `_MODELS_BY` and `_STYLE`. The notebook has them as
+variables next to `CLUBS`.
+
+## Fonts
 
 Headings use Georgia and body text uses Helvetica Neue. On other systems the nearest installed font is used (Arial,
 Liberation, DejaVu). On macOS matplotlib reads only the first face of Helvetica Neue's `.ttc`; for the exact look, put

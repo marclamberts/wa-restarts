@@ -11,10 +11,10 @@ import pandas as pd
 
 from . import config
 from .names import squad_names
-from .style import ACCENT, BG, BLUE, GREY, HAIR, INK, MUTED, MUTED2, Page, clean
+from .style import ACCENT, BG, BLUE, GREY, HAIR, INK, MUTED, MUTED2, Page, clean, ink_on
 
 CHARTS = Path(".")
-SRC = "Data: IMPECT  ·  models trained on all IMPECT leagues 2024 to 2027  ·  Waltzing Analytics"
+SRC = ""
 MIN_N = 60
 SCOPE = ""
 COLS = [("share", "Share", "{:.0%}"), ("reach_danger", "Reach\ndanger", "{:.0%}"), ("peak_xshot", "Peak\nxShot", "{:.0%}"),
@@ -172,7 +172,8 @@ def option_chart(t, rt, order_by="xg", note="", file=None):
                 good = -rel if k == "goal_against" else rel
                 fc, a = (ACCENT if good >= 0 else BLUE), 0.12 + 0.75 * min(1, abs(good) / 0.6)
             ax.add_patch(Rectangle((j + 0.04, i + 0.08), 0.92, 0.84, color=fc, alpha=a, lw=0))
-            ax.text(j + 0.5, i + 0.5, "" if np.isnan(v) else fmt.format(v), ha="center", va="center", fontsize=8.3, color=INK)
+            ax.text(j + 0.5, i + 0.5, "" if np.isnan(v) else fmt.format(v), ha="center", va="center", fontsize=8.3,
+                    color=ink_on(fc, a))
     for i, r in enumerate(g.itertuples()):
         ax.text(-0.08, i + 0.36, r.option, ha="right", va="center", fontsize=9, color=INK)
         ax.text(-0.08, i + 0.74, f"{r.n:,} restarts", ha="right", va="center", fontsize=6.8, color=MUTED)
@@ -309,9 +310,10 @@ def team_chart(tt, comp):
         mean = np.nanmean(v)
         for i, val in enumerate(v):
             rel = val / mean - 1 if mean else 0
-            ax.add_patch(Rectangle((j + 0.04, i + 0.08), 0.92, 0.84, color=ACCENT if rel >= 0 else BLUE,
-                                   alpha=0.12 + 0.75 * min(1, abs(rel) / 0.6), lw=0))
-            ax.text(j + 0.5, i + 0.5, "" if np.isnan(val) else fmt.format(val), ha="center", va="center", fontsize=8, color=INK)
+            fc, a = ACCENT if rel >= 0 else BLUE, 0.12 + 0.75 * min(1, abs(rel) / 0.6)
+            ax.add_patch(Rectangle((j + 0.04, i + 0.08), 0.92, 0.84, color=fc, alpha=a, lw=0))
+            ax.text(j + 0.5, i + 0.5, "" if np.isnan(val) else fmt.format(val), ha="center", va="center", fontsize=8,
+                    color=ink_on(fc, a) if np.isfinite(a) else INK)
     for i, team in enumerate(tt.index):
         ax.text(-0.08, i + 0.5, team, ha="right", va="center", fontsize=8.5, color=INK)
     p.save(CHARTS / "O_team_profiles.png")
@@ -322,7 +324,7 @@ def run(comp, out_dir):
     global SCOPE, CHARTS, SRC
     out_dir = Path(out_dir)
     SCOPE = comp
-    SRC = f"Data: IMPECT, {comp}  ·  models trained on all IMPECT leagues 2024 to 2027  ·  Waltzing Analytics"
+    SRC = config.source(comp, "models trained on all IMPECT leagues 2024 to 2027")
     CHARTS = out_dir / "charts"
     CHARTS.mkdir(parents=True, exist_ok=True)
     for old in CHARTS.glob("O_*.png"):

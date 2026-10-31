@@ -18,29 +18,42 @@ OUT_ROOT = _p("WA_RESTARTS_OUT", Path.cwd() / "wa_restarts_output")
 XDANGER = _p("WA_RESTARTS_XDANGER", None)                           # xDanger project, only used by build_reference
 
 # chart header and footer
-BRAND = os.getenv("WA_RESTARTS_BRAND", "WALTZING ANALYTICS")
-MARK = os.getenv("WA_RESTARTS_MARK", "WA")
-AUTHOR = os.getenv("WA_RESTARTS_AUTHOR", "Marc Lamberts")
+AUTHOR = os.getenv("WA_RESTARTS_AUTHOR", "Marc Lamberts")             # "made by": header and footer
+BRAND = os.getenv("WA_RESTARTS_BRAND", "Waltzing Analytics")          # wordmark in the header
+MARK = os.getenv("WA_RESTARTS_MARK", "WA")                            # short mark in the header
+DATA = os.getenv("WA_RESTARTS_DATA", "IMPECT")                        # data credit in the source line
+MODELS_BY = os.getenv("WA_RESTARTS_MODELS_BY", "Waltzing Analytics")  # model credit in the source line
+STYLE = os.getenv("WA_RESTARTS_STYLE", "navy")                        # colour theme, see style.THEMES
 
 # Most recent seasons were held out when the models were trained.
 TEST_SEASONS = ("2026-2027", "2026")
 WINDOW_S = 15.0
 
 PATHS = ("JSON_ROOT", "META_ROOT", "REFERENCE", "CACHE", "OUT_ROOT", "XDANGER")
-TEXT = ("BRAND", "MARK", "AUTHOR")
+TEXT = ("BRAND", "MARK", "AUTHOR", "DATA", "MODELS_BY")
 
 
 def configure(**kw):
-    """configure(json_root=..., out_root=..., cache=..., author=...) changes settings for this session."""
+    """configure(json_root=..., out_root=..., style="fog", author=..., data=..., models_by=...) for this session."""
     g = globals()
     for k, v in kw.items():
         name = k.upper()
-        if name in PATHS:
+        if name == "STYLE":
+            from . import style
+            style.use(v)
+            g[name] = style.THEME
+        elif name in PATHS:
             g[name] = Path(v).expanduser()
         elif name in TEXT:
             g[name] = v
         else:
             raise KeyError(k)
+
+
+def source(league=None, what="xDanger, xShot, xG, xGOT and restart pillars"):
+    """Footer source line: data credit (and league), then what the models are and who made them."""
+    data = f"Data: {DATA}, {league}" if league else f"Data: {DATA}"
+    return f"{data}  ·  {what}: {MODELS_BY}" if MODELS_BY else data
 
 
 def meta_root():

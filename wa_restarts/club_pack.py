@@ -29,15 +29,23 @@ from mplsoccer import Pitch, VerticalPitch
 from . import config
 from . import options as ro
 from .names import home_from_files, home_squads, squad_names
-from .style import (ACCENT, BG, BLUE, CARD, DANGER_CMAP, GOLD, GREY, HAIR, INK, MUTED, MUTED2, RED, TEAL, W, L, Page,
-                      clean)
+from . import style
+from .style import (ACCENT, BG, BLUE, CARD, DANGER_CMAP, DIM2, GOLD, GREY, HAIR, INK, MUTED, MUTED2, PURPLE, RED, SLATE, TEAL,
+                    W, L, Page, clean)
 
-SRC = "Data: IMPECT  ·  restart four-model windows (30 s) and options: Waltzing Analytics"
-PITCH = dict(pitch_type="custom", pitch_length=105, pitch_width=68, pitch_color=BG, line_color=HAIR, linewidth=1, line_zorder=2)
-HEAT = LinearSegmentedColormap.from_list("wa_heat", [BG, "#2A3A48", GOLD, ACCENT])
 TYPES = ["Corner", "Short corner", "Indirect free kick", "Direct free kick", "Penalty", "Throw-in"]
-TCOL = {"Corner": ACCENT, "Short corner": GOLD, "Indirect free kick": TEAL, "Direct free kick": BLUE, "Penalty": "#8C7BD1",
-        "Throw-in": "#6B7884", "Goal kick": MUTED2, "Kick-off": GREY}
+
+
+@style.on_theme
+def _theme():
+    """Colour constants built from the current theme."""
+    global PITCH, HEAT, TCOL
+    PITCH = dict(pitch_type="custom", pitch_length=105, pitch_width=68, pitch_color=style.BG, line_color=style.HAIR, linewidth=1,
+                 line_zorder=2)
+    HEAT = LinearSegmentedColormap.from_list("wa_heat", [style.BG, style.DIM, style.GOLD, style.ACCENT])
+    TCOL = {"Corner": style.ACCENT, "Short corner": style.GOLD, "Indirect free kick": style.TEAL, "Direct free kick": style.BLUE,
+            "Penalty": style.PURPLE, "Throw-in": style.SLATE, "Goal kick": style.MUTED2, "Kick-off": style.GREY}
+
 CORNER_ZONES = ["near post", "six-yard centre", "far post", "penalty spot", "edge of the box"]
 
 
@@ -164,7 +172,8 @@ class Ctx:
 
 # ---------------------------------------------------------------- helpers
 def page(c, title, sub, h=7.4):
-    return Page(h, f"{c.team}  ·  set pieces  ·  {c.league}", title, sub, source=SRC)
+    return Page(h, f"{c.team}  ·  set pieces  ·  {c.league}", title, sub,
+                source=config.source(c.league, "restart four-model windows (30 s) and options"))
 
 
 def axes(p, top=1.75, bottom=0.95, left=1.0, right=0.6, **kw):
@@ -225,8 +234,10 @@ def table_page(c, title, sub, rows, cols, fmt, colour_by=None, h=None):
                 cv = colour_by(i, j, v)
                 if cv is not None:
                     ax.add_patch(Rectangle((2.2 + j + 0.04, i + 0.08), 0.92, 0.84, color=cv[0], alpha=cv[1], lw=0))
+            else:
+                cv = None
             ax.text(2.2 + j + 0.5, i + 0.5, "" if v is None or (isinstance(v, float) and np.isnan(v)) else fmt[j].format(v),
-                    ha="center", va="center", fontsize=8.3, color=INK)
+                    ha="center", va="center", fontsize=8.3, color=style.ink_on(*cv) if cv is not None else INK)
     return p
 
 
@@ -524,9 +535,10 @@ def pizza(c):
     cols = [ACCENT] * 7 + [GOLD] * 3 + [TEAL] * 4
     ax.bar(th, [100] * len(th), width=wd, color=CARD, edgecolor=BG)
     ax.bar(th, pct, width=wd, color=cols, edgecolor=BG)
-    for t_, v, (_, lab, _) in zip(th, pct, PIZ):
+    for t_, v, col, (_, lab, _) in zip(th, pct, cols, PIZ):
         ax.text(t_, 117, lab, ha="center", va="center", fontsize=7.8, color=INK)
-        ax.text(t_, max(v - 9, 10), f"{v:.0f}", ha="center", va="center", fontsize=7.5, color=BG, weight="bold")
+        on = style.text_on(col) if v >= 15 else style.text_on(CARD)  # short slices put the number on the empty track
+        ax.text(t_, max(v - 9, 10), f"{v:.0f}", ha="center", va="center", fontsize=7.5, color=on, weight="bold")
     ax.set_ylim(0, 125), ax.set_yticks([]), ax.set_xticks([]), ax.spines["polar"].set_visible(False)
     ax.set_theta_offset(np.pi / 2), ax.set_theta_direction(-1)
     p.legend([("Threat", ACCENT), ("Control", GOLD), ("Defending", TEAL)], top=7.9, left=3.0)
@@ -853,7 +865,8 @@ def throw_retention_map(c):
     pt.heatmap(bs, ax=ax, cmap=HEAT, vmin=0, vmax=1, edgecolor=BG, lw=1.5, zorder=1)
     for cx, cy, v, k in zip(bs["cx"].ravel(), bs["cy"].ravel(), bs["statistic"].ravel(), n.ravel()):
         if np.isfinite(v):
-            pt.annotate(f"{v:.0%}\nn={int(k)}", xy=(cx, cy), ax=ax, ha="center", va="center", fontsize=8, color=INK, zorder=3)
+            pt.annotate(f"{v:.0%}\nn={int(k)}", xy=(cx, cy), ax=ax, ha="center", va="center", fontsize=8,
+                        color=style.ink_on(HEAT(v)), zorder=3)
     return p
 
 
@@ -977,7 +990,7 @@ def sp_share(c):
     ax = axes(p, top=1.85, left=2.6, right=0.8)
     y = np.arange(len(t))
     ax.barh(y + 0.18, t["for"], height=0.34, color=[ACCENT if i == c.team else GREY for i in t.index])
-    ax.barh(y - 0.18, t["against"], height=0.34, color=[BLUE if i == c.team else "#2E3B48" for i in t.index])
+    ax.barh(y - 0.18, t["against"], height=0.34, color=[BLUE if i == c.team else DIM2 for i in t.index])
     ax.set_yticks(y), ax.set_yticklabels(t.index, fontsize=8)
     ax.xaxis.set_major_formatter(lambda v, _: f"{v:.0%}")
     clean(ax, grid="x")
@@ -1075,9 +1088,11 @@ def danger_heat(c):
     n = pt.bin_statistic(px(d.x), py(d.y), statistic="count", bins=(8, 6))["statistic"]
     bs["statistic"] = np.where(n >= 3, bs["statistic"], np.nan)
     pt.heatmap(bs, ax=ax, cmap=HEAT, edgecolor=BG, lw=1.5, zorder=1)
+    norm = Normalize(np.nanmin(bs["statistic"]), np.nanmax(bs["statistic"]))
     for cx, cy, v in zip(bs["cx"].ravel(), bs["cy"].ravel(), bs["statistic"].ravel()):
         if np.isfinite(v):
-            pt.annotate(f"{v:.3f}", xy=(cx, cy), ax=ax, ha="center", va="center", fontsize=7.5, color=INK, zorder=3)
+            pt.annotate(f"{v:.3f}", xy=(cx, cy), ax=ax, ha="center", va="center", fontsize=7.5,
+                        color=style.ink_on(HEAT(norm(v))), zorder=3)
     return p
 
 

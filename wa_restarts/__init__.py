@@ -1,7 +1,8 @@
 """wa_restarts: IMPECT event data -> Waltzing Analytics set-piece and restart visuals and CSVs.
 
     import wa_restarts as wr
-    wr.configure(json_root="events_json", out_root="wa_restarts_output")
+    wr.configure(json_root="events_json", out_root="wa_restarts_output", style="fog",
+                 author="Marc Lamberts", brand="Waltzing Analytics", data="IMPECT", models_by="Waltzing Analytics")
     wr.leagues()                                         # league-seasons with event JSON
     wr.teams("2. Bundesliga 2026-2027")                  # clubs in one league-season
     wr.league("2. Bundesliga 2026-2027", focus_team="Hertha BSC")   # league folder (charts, visual pack, CSVs)
@@ -12,7 +13,13 @@ from pathlib import Path
 from . import config
 from .config import configure
 
-__all__ = ["configure", "leagues", "teams", "score", "league", "club", "build"]
+__all__ = ["configure", "styles", "leagues", "teams", "score", "league", "club", "build"]
+
+
+def styles():
+    """Colour themes for configure(style=...)."""
+    from .style import THEMES
+    return list(THEMES)
 
 
 def leagues():
