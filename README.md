@@ -6,7 +6,9 @@ league-season and it builds:
 - a **league folder**: restart options per restart type, club set-piece profiles and a 24-chart visual pack (pitch
   maps, scatters, pizzas, beeswarms, bars, box plots), each with its CSV;
 - a **club pack** for any club: 59 charts on its attacking and defending restarts, plus every restart as CSV;
-- **xDanger** for every action, player and team (see [xDanger](#xdanger)).
+- **xDanger** for every action, player and team (see [xDanger](#xdanger));
+- **reports** as PDF + PNG pages: post-match, player (match and season), set pieces and restarts (team or league-wide),
+  see [Reports](#reports).
 
 Each restart is scored with pre-trained models (xG, xGOT, xDanger, xShot). The models were trained on every IMPECT
 league from 2024 to 2027 by [Waltzing Analytics](https://github.com/marclamberts). Nothing is retrained, and a league
@@ -84,6 +86,51 @@ Scoring is cached in `~/.cache/wa_restarts/<league-season>/` and reruns on its o
 | `visual pack/club_set_piece_table.csv`, `club_percentiles.csv` | tables behind the visual pack |
 | `<club> set pieces/NN_*.png` | 59-chart club pack |
 | `<club> set pieces/restarts_for.csv`, `restarts_against.csv`, `league_set_piece_table.csv` | every restart by and against the club, and the league table |
+
+## Reports
+
+Four reports, each written as one PDF plus a PNG per page, in any style and font:
+
+| Report | For | Pages |
+|---|---|---|
+| `post_match` | one match (a team's latest, `"Home vs Away"` or a match id) | **short**: one portrait page with scoreboard, xG race, shot map, key numbers and xDanger momentum. **long** (14 pages): cover, executive summary, team statistics, percentiles against every team-match in the league, xG timeline and momentum, shot maps, shot list, passing networks, territory, where the danger came from, xDanger creators, set pieces and restarts, and both teams' players |
+| `player` | one player | **match** (short + long): cards ranked within the match, percentile profile against the position group's player-matches, touch map and heatmap, passing, danger created and received, shots and defending. **season**: per-90 cards ranked in the position group, xDanger and xG by match, percentile profile, touch maps, progression, shots, match log |
+| `set_piece` | a team, or the league | cover (headline numbers, every restart type against the league), then the club set-piece pack (corners, free kicks, long throws, penalties, shots, takers, defending, league comparison) or the league visual pack |
+| `restart` | a team, or the league | cover, then every restart as a play: options per restart type, goal kicks, throw-ins, kick-offs, sequences, setup time, pillars, danger by location |
+
+```python
+import wa_restarts as wr
+
+wr.configure(json_root="events_json", style="fog", font="plex")
+wr.report("post_match", "Eredivisie 2026-2027", team="Ajax")                 # Ajax's latest match
+wr.report("post_match", "Eredivisie 2026-2027", match="PSV vs Feyenoord")
+wr.report("player", "Eredivisie 2026-2027", player="Gloukh", season=True)
+wr.report("set_piece", "Eredivisie 2026-2027", team="Ajax")                  # team=None: league-wide
+wr.reports("Eredivisie 2026-2027", clubs=["Ajax", "PSV"], players=["Gloukh"], scope="both",
+           styles=["navy", "fog"], fonts=["house", "spectral"])               # everything, in every combination
+```
+
+```bash
+wa-restarts --json-root events_json --style fog report post_match "Eredivisie 2026-2027" --team Ajax --forms short
+wa-restarts --json-root events_json report player "Eredivisie 2026-2027" --player Gloukh --season
+wa-restarts --json-root events_json report restart "Eredivisie 2026-2027"
+```
+
+Output: `<out>/<league>/reports/`
+
+```
+post-match/<date>_<Home>_vs_<Away>/short_<style>_<font>.pdf, long_<style>_<font>.pdf  (+ a folder of PNG pages each)
+players/<Player>/<date>_vs_<Opponent>/short_*.pdf, long_*.pdf
+players/<Player>/season_<style>_<font>.pdf
+set-piece/<Team>_<style>_<font>.pdf, league_<style>_<font>.pdf
+restart/<Team>_<style>_<font>.pdf, league_<style>_<font>.pdf
+```
+
+The notebook sets these next to `CLUBS`: `REPORTS`, `MATCH`, `PLAYERS`, `PLAYER_REPORTS`, `SCOPE`, `FORMS`. `STYLE` and
+`FONT` can be lists, and the reports are then written in every combination.
+
+Everything in the reports comes from the models and data in this package. League context uses every team-match or
+player-match of the same league-season, and player percentiles stay within a position group.
 
 ## xDanger
 
@@ -210,9 +257,19 @@ variables next to `CLUBS`.
 
 ## Fonts
 
-Headings use Georgia and body text uses Helvetica Neue. On other systems the nearest installed font is used (Arial,
-Liberation, DejaVu). On macOS matplotlib reads only the first face of Helvetica Neue's `.ttc`; for the exact look, put
-extracted `.ttf` faces in `wa_restarts/fonts/` (git-ignored, not redistributable).
+| `font` | Headlines | Body |
+|---|---|---|
+| `house` (default) | Georgia | Helvetica Neue |
+| `plex` | IBM Plex Serif | Lato |
+| `spectral` | Spectral | Barlow |
+| `display` | DM Serif Display | Lato |
+| `barlow` | Barlow | Barlow |
+
+`wr.configure(font="spectral")` or `--font spectral`; `wa-restarts fonts` lists them. All fonts except `house` ship with
+the package (SIL Open Font License, see `wa_restarts/fonts_bundled/OFL-*.txt`), so they look the same on every machine.
+`house` uses the system fonts and falls back to the nearest installed font (Arial, Liberation, DejaVu). On macOS
+matplotlib reads only the first face of Helvetica Neue's `.ttc`; for the exact house look, put extracted `.ttf` faces in
+`wa_restarts/fonts/` or point `WA_RESTARTS_FONTS` at a folder (Apple's fonts can't be redistributed).
 
 ## Settings
 
@@ -222,6 +279,7 @@ extracted `.ttf` faces in `wa_restarts/fonts/` (git-ignored, not redistributable
 | Metadata root | `--meta-root` | `WA_RESTARTS_META` | `events_meta` next to the JSON root |
 | Output | `--out` | `WA_RESTARTS_OUT` | `./wa_restarts_output` |
 | Cache | `--cache` | `WA_RESTARTS_CACHE` | `~/.cache/wa_restarts` |
+| Style / font | `--style` / `--font` | `WA_RESTARTS_STYLE` / `WA_RESTARTS_FONT` | `navy` / `house` |
 | Models and reference tables | | `WA_RESTARTS_REFERENCE` | `wa_restarts/reference/` |
 
 ## Reference files
@@ -249,4 +307,4 @@ python -m wa_restarts.build_reference /path/to/xDanger
 
 ## Licence
 
-MIT © Marc Lamberts (Waltzing Analytics). Event data is IMPECT's and is subject to your IMPECT licence.
+MIT © Marc Lamberts (Waltzing Analytics). Bundled fonts: SIL Open Font License 1.1 (their own copyright). Event data is IMPECT's and is subject to your IMPECT licence.

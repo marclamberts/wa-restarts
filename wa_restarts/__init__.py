@@ -8,14 +8,90 @@
     wr.league("2. Bundesliga 2026-2027", focus_team="Hertha BSC")   # league folder (charts, visual pack, CSVs)
     wr.club("2. Bundesliga 2026-2027", "Hertha")         # one club's set-piece pack
     wr.xdanger_players("2. Bundesliga 2026-2027")        # xDanger per player (also _actions, _teams; xdanger() writes all)
+    wr.report("post_match", "2. Bundesliga 2026-2027", team="Hertha")      # also "player", "set_piece", "restart"
 """
 from pathlib import Path
 
 from . import config
 from .config import configure
 
-__all__ = ["configure", "styles", "leagues", "teams", "score", "league", "club", "build", "xdanger", "xdanger_actions",
-           "xdanger_players", "xdanger_teams"]
+__all__ = ["configure", "styles", "fonts", "leagues", "teams", "score", "league", "club", "build", "xdanger",
+           "xdanger_actions", "xdanger_players", "xdanger_teams", "report", "reports", "REPORTS"]
+
+REPORTS = ("post_match", "player", "set_piece", "restart")
+
+
+def fonts():
+    """Font pairings for configure(font=...)."""
+    from .style import FONTS
+    return list(FONTS)
+
+
+def report(kind, comp, team=None, match=None, player=None, forms=("short", "long"), season=False, min_minutes=450,
+           out_root=None):
+    """One report as PDF + PNG pages under <out_root>/<comp>/reports/, in the current style and font.
+
+    kind="post_match": match ("Home vs Away", a match id) or team (its latest match); forms short and/or long
+    kind="player":     player name (partial works); season=True for the season report, else the match report (match or
+                       the player's latest match)
+    kind="set_piece" / "restart": team, or team=None for the league-wide report
+    """
+    score(comp)
+    if kind == "post_match":
+        from .reporting import post_match
+        return post_match.build(comp, match=match, team=team, forms=forms, out_root=out_root)
+    if kind == "player":
+        from .reporting import player as pr
+        if season:
+            return pr.season_report(comp, player, team=team, min_minutes=min_minutes, out_root=out_root)
+        return pr.match_report(comp, player, match=match, team=team, forms=forms, out_root=out_root)
+    if kind in ("set_piece", "restart"):
+        from .reporting import setpiece
+        return [setpiece.build(comp, kind, team=team, out_root=out_root)]
+    raise ValueError(f"kind must be one of {REPORTS}")
+
+
+def reports(comp, kinds=REPORTS, clubs=(), match="latest", players=(), player_reports=("match", "season"), scope="team",
+            forms=("short", "long"), styles=None, fonts=None, min_minutes=450, out_root=None):
+    """Several reports in one go, optionally in several styles and fonts (default: the current ones).
+
+    post_match: each club's match (match="latest", "Home vs Away" or an id); player: each name in players;
+    set_piece / restart: each club (scope "team"), the league (scope "league") or both (scope "both").
+    A report that cannot be built is skipped with its reason.
+    """
+    from . import style as st
+    styles = [styles] if isinstance(styles, str) else (styles or [st.THEME])
+    fonts_ = [fonts] if isinstance(fonts, str) else (fonts or [st.FONT])
+    start = (st.THEME, st.FONT)
+    jobs = []
+    m = None if match in (None, "", "latest") else match
+    if "post_match" in kinds:
+        jobs += [dict(kind="post_match", team=c, match=m) for c in clubs] or ([dict(kind="post_match", match=m)] if m else [])
+    if "player" in kinds:
+        for pl in players:
+            if "match" in player_reports:
+                jobs.append(dict(kind="player", player=pl, match=m))
+            if "season" in player_reports:
+                jobs.append(dict(kind="player", player=pl, season=True))
+    for k in ("set_piece", "restart"):
+        if k in kinds:
+            if scope in ("team", "both"):
+                jobs += [dict(kind=k, team=c) for c in clubs]
+            if scope in ("league", "both") or not clubs:
+                jobs.append(dict(kind=k))
+    out = []
+    try:
+        for sty in styles:
+            for fnt in fonts_:
+                configure(style=sty, font=fnt)
+                for j in jobs:
+                    try:
+                        out += report(comp=comp, forms=forms, min_minutes=min_minutes, out_root=out_root, **j)
+                    except (ValueError, KeyError) as e:
+                        print(f"skipped {j}: {e}", flush=True)
+    finally:
+        configure(style=start[0], font=start[1])
+    return out
 
 
 def styles():

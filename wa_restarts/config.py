@@ -24,6 +24,7 @@ MARK = os.getenv("WA_RESTARTS_MARK", "WA")                            # short ma
 DATA = os.getenv("WA_RESTARTS_DATA", "IMPECT")                        # data credit in the source line
 MODELS_BY = os.getenv("WA_RESTARTS_MODELS_BY", "Waltzing Analytics")  # model credit in the source line
 STYLE = os.getenv("WA_RESTARTS_STYLE", "navy")                        # colour theme, see style.THEMES
+FONT = os.getenv("WA_RESTARTS_FONT", "house")                         # font pairing, see style.FONTS
 
 # Most recent seasons were held out when the models were trained.
 TEST_SEASONS = ("2026-2027", "2026")
@@ -34,7 +35,7 @@ TEXT = ("BRAND", "MARK", "AUTHOR", "DATA", "MODELS_BY")
 
 
 def configure(**kw):
-    """configure(json_root=..., out_root=..., style="fog", author=..., data=..., models_by=...) for this session."""
+    """configure(json_root=..., out_root=..., style="fog", font="plex", author=..., data=..., models_by=...)."""
     g = globals()
     for k, v in kw.items():
         name = k.upper()
@@ -42,6 +43,10 @@ def configure(**kw):
             from . import style
             style.use(v)
             g[name] = style.THEME
+        elif name == "FONT":
+            from . import style
+            style.use_font(v)
+            g[name] = style.FONT
         elif name in PATHS:
             g[name] = Path(v).expanduser()
         elif name in TEXT:

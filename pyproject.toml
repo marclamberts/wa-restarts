@@ -29,7 +29,7 @@ wa-restarts = "wa_restarts.cli:main"
 include = ["wa_restarts*"]
 
 [tool.setuptools.package-data]
-wa_restarts = ["reference/*.csv", "reference/*.parquet", "reference/models/*.joblib"]
+wa_restarts = ["fonts_bundled/*.ttf", "fonts_bundled/*.txt", "reference/*.csv", "reference/*.parquet", "reference/models/*.joblib"]
 
 [project.urls]
 Repository = "https://github.com/marclamberts/wa-restarts"

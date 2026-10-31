@@ -83,6 +83,20 @@ def text_on(color):
     return BG if ratio(BG, color) >= ratio(INK, color) else INK
 
 
+_COLLECT = []
+
+
+class collect:
+    """with collect() as pages: chart functions that call Page.save hand their pages to the list instead."""
+    def __enter__(self):
+        _COLLECT.append([])
+        return _COLLECT[-1]
+
+    def __exit__(self, *exc):
+        _COLLECT.pop()
+        return False
+
+
 THEME = config.STYLE.lower() if config.STYLE.lower() in THEMES else "navy"
 globals().update(_tokens(THEME))
 _HOOKS = []
@@ -158,8 +172,39 @@ def _nan_safe_bins():
 
 
 _nan_safe_bins()
-SANS = _first("Helvetica Neue", "Helvetica", "Arial", "Liberation Sans", "DejaVu Sans")
-SERIF = _first("Georgia", "Times New Roman", "Liberation Serif", "DejaVu Serif")
+# font pairings (headline serif, body sans). house uses the macOS fonts; the others ship with the package
+# (SIL Open Font License, wa_restarts/fonts_bundled/) so they look the same on every machine.
+for _f in (Path(__file__).parent / "fonts_bundled").glob("*.ttf"):
+    font_manager.fontManager.addfont(str(_f))
+FONTS = {
+    "house": (("Georgia", "Times New Roman", "Liberation Serif", "DejaVu Serif"),
+              ("Helvetica Neue", "Helvetica", "Arial", "Liberation Sans", "DejaVu Sans")),
+    "plex": (("IBM Plex Serif",), ("Lato",)),
+    "spectral": (("Spectral",), ("Barlow",)),
+    "display": (("DM Serif Display",), ("Lato",)),
+    "barlow": (("Barlow",), ("Barlow",)),
+}
+FONT = config.FONT.lower() if config.FONT.lower() in FONTS else "house"
+SERIF, SANS = _first(*FONTS[FONT][0]), _first(*FONTS[FONT][1])
+
+
+def fonts():
+    return list(FONTS)
+
+
+def use_font(name):
+    """Switch the headline / body font pairing (house, plex, spectral, display, barlow)."""
+    global FONT, SERIF, SANS
+    name = name.lower()
+    if name not in FONTS:
+        raise ValueError(f"Unknown font '{name}'. Fonts: {', '.join(FONTS)}")
+    FONT, SERIF, SANS = name, _first(*FONTS[name][0]), _first(*FONTS[name][1])
+    for mod in list(sys.modules.values()):
+        if getattr(mod, "__name__", "").startswith("wa_restarts.") and mod not in (sys.modules[__name__], config):
+            for k, v in (("SERIF", SERIF), ("SANS", SANS)):
+                if k in vars(mod):
+                    setattr(mod, k, v)
+    _rc()
 
 
 
@@ -167,16 +212,18 @@ def _rc():
     plt.rcParams.update({"font.family": SANS, "text.color": INK, "axes.labelcolor": MUTED2,
                          "xtick.color": MUTED2, "ytick.color": MUTED2, "axes.edgecolor": HAIR,
                          "axes.facecolor": BG, "figure.facecolor": BG, "axes.labelsize": 9.5,
-                         "xtick.labelsize": 9, "ytick.labelsize": 9})
+                         "xtick.labelsize": 9, "ytick.labelsize": 9,
+                         "figure.max_open_warning": 0})  # reports hold every page open until the PDF is written
 
 
 _rc()
 
 
 class Page:
-    def __init__(self, h, eyebrow, title, subtitle, source=None):
+    def __init__(self, h, eyebrow, title, subtitle, source=None, w=None):
         source = source or config.source()
-        self.h = h
+        self.h, self.w = h, w or globals()["W"]
+        W = self.w
         self.fig = plt.figure(figsize=(W, h), facecolor=BG)
         bg = self.fig.add_axes([0, 0, 1, 1])
         bg.set_axis_off()
@@ -203,11 +250,13 @@ class Page:
         bg.text(xr, y(0.72), config.AUTHOR.upper(), fontsize=7, ha="right", va="center", color=MUTED)
         # footer
         bg.plot([L / W, xr], [0.62 / h] * 2, color=HAIR, lw=0.8, transform=bg.transAxes)
-        bg.text(L / W, 0.34 / h, source, fontsize=8, color=MUTED, va="center")
-        bg.text(xr, 0.34 / h, f"{config.AUTHOR} | Created on {date.today():%d-%m-%Y}", fontsize=8,
+        narrow = W < 9  # portrait pages: source and author on two lines
+        bg.text(L / W, (0.45 if narrow else 0.34) / h, source, fontsize=7.5 if narrow else 8, color=MUTED, va="center")
+        bg.text(xr, (0.22 if narrow else 0.34) / h, f"{config.AUTHOR} | Created on {date.today():%d-%m-%Y}", fontsize=8,
                 color=MUTED, ha="right", va="center")
 
     def axes(self, top, bottom, left=L, right=R, **kw):
+        W = self.w
         """Axes placed by inches from the top edge (top) and the bottom edge (bottom)."""
         ax = self.fig.add_axes([left / W, bottom / self.h, 1 - (left + right) / W,
                                 (self.h - top - bottom) / self.h], **kw)
@@ -215,12 +264,14 @@ class Page:
         return ax
 
     def section(self, label, top, left=L):
+        W = self.w
         y = 1 - top / self.h
         self.bg.add_patch(Rectangle((left / W, y - 0.04 / self.h), 0.08 / W, 0.08 / self.h,
                                     color=ACCENT, transform=self.bg.transAxes))
         self.bg.text((left + 0.15) / W, y, label.upper(), fontsize=8.5, weight="bold", color=INK, va="center")
 
     def cards(self, items, top, height=0.95, left=L, right=R, gap=0.14):
+        W = self.w
         """items: (label, value, sub). Drawn as dark panels with hairline borders."""
         n = len(items)
         w = (W - left - right - gap * (n - 1)) / n
@@ -236,6 +287,7 @@ class Page:
             self.bg.text(tx, (yb + 0.15) / self.h, sub, fontsize=7, color=MUTED, va="center")
 
     def legend(self, entries, top, left=L, marker="s"):
+        W = self.w
         x = left
         y = 1 - top / self.h
         for label, color in entries:
@@ -244,6 +296,9 @@ class Page:
             x += 0.4 + 0.068 * len(label)
 
     def save(self, path):
+        if _COLLECT:  # inside collect(): hand the page to a report instead of writing a PNG
+            _COLLECT[-1].append((self, Path(path).stem))
+            return
         self.fig.savefig(path, dpi=200, facecolor=BG)
         plt.close(self.fig)
 

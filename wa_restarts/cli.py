@@ -6,6 +6,9 @@
     wa-restarts club "2. Bundesliga 2026-2027" "Hertha" "St. Pauli"
     wa-restarts build "2. Bundesliga 2026-2027" --club "Hertha BSC"     # league folder + club packs
     wa-restarts xdanger "2. Bundesliga 2026-2027"                       # xDanger per action, player, team
+    wa-restarts --style fog --font plex report post_match "2. Bundesliga 2026-2027" --team Hertha
+    wa-restarts report player "2. Bundesliga 2026-2027" --player Reese --season
+    wa-restarts report set_piece "2. Bundesliga 2026-2027"                     # league-wide; --team for one club
 """
 import argparse
 
@@ -23,6 +26,7 @@ def main(argv=None):
     ap.add_argument("--out", help="deliverables root (default: ./wa_restarts_output)")
     ap.add_argument("--cache", help="where scored parquet files are kept (default: ~/.cache/wa_restarts)")
     ap.add_argument("--style", help="colour theme: navy (default), fog, dusk, cream, clay, espresso, xhotspur")
+    ap.add_argument("--font", help="font pairing: house (default), plex, spectral, display, barlow")
     ap.add_argument("--author", help="made by: name in the chart header and footer (default: Marc Lamberts)")
     ap.add_argument("--brand", help="wordmark in the chart header (default: Waltzing Analytics)")
     ap.add_argument("--mark", help="short mark in the chart header (default: WA)")
@@ -31,6 +35,15 @@ def main(argv=None):
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("leagues", help="league-seasons with event JSON")
     sub.add_parser("styles", help="colour themes")
+    sub.add_parser("fonts", help="font pairings")
+    p = sub.add_parser("report", help="post_match | player | set_piece | restart report (PDF + PNG pages)")
+    p.add_argument("kind", choices=["post_match", "player", "set_piece", "restart"])
+    p.add_argument("league")
+    p.add_argument("--team", help="club (post_match: its latest match; set_piece/restart: team report, omit for league-wide)")
+    p.add_argument("--match", help="'Home vs Away' or a match id")
+    p.add_argument("--player", help="player name (partial works)")
+    p.add_argument("--season", action="store_true", help="player: season report instead of a match report")
+    p.add_argument("--forms", nargs="+", default=["short", "long"], choices=["short", "long"])
     p = sub.add_parser("teams", help="clubs in a league-season")
     p.add_argument("league")
     p = sub.add_parser("score", help="score a league-season into the cache only")
@@ -54,13 +67,17 @@ def main(argv=None):
     p.add_argument("--refresh", action="store_true")
     a = ap.parse_args(argv)
     wr.configure(**{k: v for k, v in {"json_root": a.json_root, "meta_root": a.meta_root, "out_root": a.out,
-                                      "cache": a.cache, "style": a.style, "author": a.author,
+                                      "cache": a.cache, "style": a.style, "font": a.font, "author": a.author,
                                       "brand": a.brand, "mark": a.mark, "data": a.data,
                                       "models_by": a.models_by}.items() if v})
     if a.cmd == "leagues":
         print("\n".join(wr.leagues()))
     elif a.cmd == "styles":
         print("\n".join(wr.styles()))
+    elif a.cmd == "fonts":
+        print("\n".join(wr.fonts()))
+    elif a.cmd == "report":
+        wr.report(a.kind, a.league, team=a.team, match=a.match, player=a.player, forms=tuple(a.forms), season=a.season)
     elif a.cmd == "teams":
         print("\n".join(wr.teams(a.league)))
     elif a.cmd == "score":
